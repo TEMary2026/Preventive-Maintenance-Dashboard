@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PM / Audit Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',system-ui,sans-serif;background:#f0eff9;color:#1a1a2e;font-size:13px}
+header{background:#1a1a2e;color:#fff;padding:0 1.5rem;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.logo{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:#f4b942}
+.header-right{display:flex;align-items:center;gap:12px}
+#last-updated{font-size:11px;color:#8888aa}
+#refresh-btn{font-size:11px;padding:4px 12px;border-radius:6px;border:1px solid #444;background:transparent;color:#ccc;cursor:pointer}
+#refresh-btn:hover{background:#333}
+#refresh-btn.loading{opacity:0.4;pointer-events:none}
+main{max-width:1400px;margin:0 auto;padding:1rem 1.25rem 2rem}
+.url-bar{background:#fff;border-radius:10px;padding:0.75rem 1rem;margin-bottom:1rem;display:flex;align-items:center;gap:10px;box-shadow:0 1px 4px rgba(0,0,0,0.07)}
+.url-bar input{flex:1;font-size:12px;padding:6px 10px;border-radius:6px;border:1px solid #ddd;background:#f8f8fc;color:#1a1a2e;font-family:'DM Mono',monospace}
+.url-bar button{font-size:12px;padding:6px 16px;border-radius:6px;border:none;background:#1a1a2e;color:#fff;cursor:pointer;font-weight:500;white-space:nowrap}
+.url-bar button:hover{background:#2d2d4e}
+.url-label{font-size:11px;font-weight:600;color:#888;white-space:nowrap}
+.filters{display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap;align-items:center}
+.filter-label{font-size:11px;color:#888;margin-right:2px;font-weight:500}
+.filter-btn{font-size:11px;padding:4px 12px;border-radius:20px;border:1px solid #ddd;background:#fff;color:#555;cursor:pointer}
+.filter-btn.active{background:#1a1a2e;color:#fff;border-color:#1a1a2e}
+.error-msg{background:#fff0f0;color:#c0392b;border-radius:8px;padding:0.6rem 1rem;font-size:12px;margin-bottom:1rem;border:1px solid #fcc}
+
+/* Metric cards */
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1rem}
+.metric{background:#fff;border-radius:10px;padding:1rem 1.25rem;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+.metric-label{font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px}
+.metric-value{font-size:30px;font-weight:700;line-height:1;margin-bottom:2px}
+.metric-sub{font-size:10px;color:#aaa}
+
+/* Charts grid */
+.charts-top{display:grid;grid-template-columns:1fr 340px;gap:10px;margin-bottom:10px}
+.charts-bottom{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.card{background:#fff;border-radius:10px;padding:1.25rem;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+.card-title{font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:1rem}
+
+/* Pie legend */
+.pie-legend{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.pie-legend-item{display:flex;align-items:center;gap:8px;font-size:12px}
+.pie-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+
+/* Summary table */
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{font-size:10px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.04em;padding:7px 8px;border-bottom:1px solid #eee;text-align:left;white-space:nowrap}
+td{padding:7px 8px;border-bottom:1px solid #f5f5f5;vertical-align:middle}
+tr:last-child td{border-bottom:none;font-weight:700;background:#f8f8fc}
+tbody tr:hover td{background:#f8f8fc}
+.badge{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px}
+.action-tag{display:inline-block;font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;margin:1px}
+.mono{font-family:'DM Mono',monospace;font-size:11px}
+.loader{text-align:center;padding:3rem;color:#888;font-size:13px}
+
+/* Status colors */
+.s-done{background:#e8f5e9;color:#2e7d32}
+.s-wait{background:#fff8e1;color:#f57f17}
+.s-audit{background:#e3f2fd;color:#1565c0}
+.s-ext{background:#f3e5f5;color:#6a1b9a}
+
+@media(max-width:900px){
+  .charts-top,.charts-bottom{grid-template-columns:1fr}
+  .metrics{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><div class="logo-dot"></div>Preventive Maintenance Dashboard</div>
+  <div class="header-right">
+    <span id="last-updated">Not loaded</span>
+    <button id="refresh-btn" onclick="loadData()">↻ Refresh</button>
+  </div>
+</header>
+
+<main>
+  <div class="url-bar">
+    <span class="url-label">Apps Script URL</span>
+    <input type="text" id="api-url" placeholder="https://script.google.com/macros/s/YOUR_ID/exec"/>
+    <button onclick="saveAndLoad()">Load Data</button>
+  </div>
+  <div id="error-container"></div>
+  <div id="loader" class="loader">วาง Apps Script URL ด้านบน แล้วกด Load Data</div>
+
+  <div id="dashboard" style="display:none">
+    <div class="filters" id="filter-bar"><span class="filter-label">Engineer EN:</span></div>
+
+    <div class="metrics" id="metrics"></div>
+
+    <div class="charts-top">
+      <!-- Pareto chart -->
+      <div class="card">
+        <div class="card-title">Pareto — Finding by Customer</div>
+        <div style="position:relative;height:300px"><canvas id="paretoChart" role="img" aria-label="Pareto chart of findings by customer"></canvas></div>
+      </div>
+      <!-- Right side: Pie + Bar -->
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div class="card" style="flex:1">
+          <div class="card-title">PM Status</div>
+          <div style="display:flex;align-items:center;gap:1rem">
+            <div style="position:relative;width:120px;height:120px;flex-shrink:0"><canvas id="pieChart" role="img" aria-label="Pie chart PM status"></canvas></div>
+            <div class="pie-legend" id="pie-legend"></div>
+          </div>
+        </div>
+        <div class="card" style="flex:1">
+          <div class="card-title">Station Test (ICT / FCT)</div>
+          <div style="position:relative;height:100px"><canvas id="stationChart" role="img" aria-label="Bar chart station test"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="charts-bottom">
+      <!-- Action pareto -->
+      <div class="card">
+        <div class="card-title">Pareto — Action Required</div>
+        <div style="position:relative;height:220px"><canvas id="actionParetoChart" role="img" aria-label="Pareto action breakdown"></canvas></div>
+      </div>
+      <!-- Finding type pareto -->
+      <div class="card">
+        <div class="card-title">Pareto — Top Finding Types</div>
+        <div style="position:relative;height:220px"><canvas id="findingParetoChart" role="img" aria-label="Pareto finding types"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Summary table -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
+        <div class="card-title" style="margin:0">Engineer Summary</div>
+        <input type="text" id="search-box" placeholder="ค้นหา ID, Project, Customer…" style="font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid #ddd;background:#f8f8fc;width:200px" oninput="renderTable()">
+      </div>
+      <div style="overflow-x:auto">
+      <table id="detail-table">
+        <thead><tr>
+          <th>EN</th><th>Date</th><th>Asset ID</th><th>Customer</th><th>Project</th><th>Proc</th><th>PM Status</th><th>Actions</th><th>Critical A1</th>
+        </tr></thead>
+        <tbody id="detail-body"></tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+const COLORS = {
+  navy:'#1a1a2e', gold:'#f4b942', teal:'#2196a6', coral:'#e05c5c',
+  green:'#43a047', purple:'#7c5cbf', blue:'#2979c4', gray:'#8e8e9e',
+  orange:'#f57c00', pink:'#d81b7a'
+};
+const ACTION_C = {
+  A1:{bg:'#fdecea',text:'#c0392b',hex:'#e05c5c'},
+  A2:{bg:'#fff8e1',text:'#e65100',hex:'#f4b942'},
+  A3:{bg:'#e3f2fd',text:'#1565c0',hex:'#2979c4'},
+  A4:{bg:'#f3e5f5',text:'#6a1b9a',hex:'#7c5cbf'},
+  A5:{bg:'#e8f5e9',text:'#2e7d32',hex:'#43a047'},
+  A38:{bg:'#ede7f6',text:'#4527a0',hex:'#9575cd'},
+};
+const ACTION_L = {A1:'Corrective action',A2:'Spare part',A3:'Label',A4:'Replacement',A5:'Cleaned',A38:'Audit pass'};
+
+let allData=[], grouped=[], currentEN='all';
+let chartInst={};
+
+function saveAndLoad(){
+  const u=document.getElementById('api-url').value.trim();
+  if(u){localStorage.setItem('pm_url',u);loadData();}
+}
+window.onload=()=>{
+  const s=localStorage.getItem('pm_url');
+  if(s){document.getElementById('api-url').value=s;loadData();}
+};
+
+function loadData(){
+  const url=document.getElementById('api-url').value.trim();
+  if(!url)return;
+  const btn=document.getElementById('refresh-btn');
+  btn.classList.add('loading');btn.textContent='⟳ Loading…';
+  document.getElementById('error-container').innerHTML='';
+  const old=document.getElementById('_jscb');if(old)old.remove();
+  window._pmCB=function(json){
+    allData=json.data||[];
+    grouped=groupEq(allData);
+    document.getElementById('last-updated').textContent='Updated: '+new Date(json.updated).toLocaleTimeString('th-TH');
+    buildFilters();render();
+    document.getElementById('dashboard').style.display='block';
+    document.getElementById('loader').style.display='none';
+    btn.classList.remove('loading');btn.textContent='↻ Refresh';
+  };
+  fetch(url).then(r=>r.json()).then(j=>window._pmCB(j)).catch(()=>{
+    const s=document.createElement('script');s.id='_jscb';
+    s.onerror=()=>{
+      document.getElementById('error-container').innerHTML='<div class="error-msg">⚠ โหลดไม่ได้ — ตรวจสอบ URL และ Deploy settings</div>';
+      document.getElementById('loader').style.display='none';
+      btn.classList.remove('loading');btn.textContent='↻ Refresh';
+    };
+    s.src=url+(url.includes('?')?'&':'?')+'callback=_pmCB&t='+Date.now();
+    document.head.appendChild(s);
+  });
+}
+
+function groupEq(rows){
+  const m={};
+  rows.forEach(r=>{
+    const k=r.en+'|'+r.id+'|'+r.date;
+    if(!m[k])m[k]={en:r.en,date:r.date,id:r.id,cust:r.cust,proj:r.proj,proc:r.proc,pmStatus:r.pmStatus,findings:[]};
+    if(r.finding||r.action)m[k].findings.push({code:r.finding,desc:r.mainFinding,action:r.action});
+  });
+  return Object.values(m);
+}
+
+function getFiltered(){return currentEN==='all'?grouped:grouped.filter(d=>d.en===currentEN);}
+
+function buildFilters(){
+  const ens=[...new Set(grouped.map(d=>d.en))].sort();
+  const bar=document.getElementById('filter-bar');
+  bar.innerHTML='<span class="filter-label">Engineer EN:</span>';
+  [['all','ทั้งหมด'],...ens.map(e=>[e,e])].forEach(([v,l])=>{
+    const b=document.createElement('button');
+    b.className='filter-btn'+(v===currentEN?' active':'');
+    b.textContent=l;
+    b.onclick=()=>{currentEN=v;document.querySelectorAll('.filter-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active');render();};
+    bar.appendChild(b);
+  });
+}
+
+function destroyChart(id){if(chartInst[id]){chartInst[id].destroy();delete chartInst[id];}}
+
+function render(){
+  const data=getFiltered();
+  const allF=data.flatMap(d=>d.findings);
+  const critical=allF.filter(f=>f.action==='A1').length;
+  const pmDone=data.filter(d=>d.pmStatus==='PM Done').length;
+  const auditPass=data.filter(d=>d.pmStatus==='Audit Pass').length;
+
+  // Metrics
+  document.getElementById('metrics').innerHTML=`
+    <div class="metric"><div class="metric-label">Equipment</div><div class="metric-value">${data.length}</div><div class="metric-sub">units inspected</div></div>
+    <div class="metric"><div class="metric-label">Total Findings</div><div class="metric-value">${allF.length}</div><div class="metric-sub">all categories</div></div>
+    <div class="metric"><div class="metric-label" style="color:#c0392b">Critical A1</div><div class="metric-value" style="color:#c0392b">${critical}</div><div class="metric-sub">corrective action</div></div>
+    <div class="metric"><div class="metric-label" style="color:#2e7d32">PM Done</div><div class="metric-value" style="color:#2e7d32">${pmDone}</div><div class="metric-sub">of ${data.length} units</div></div>
+  `;
+
+  // --- PARETO: Finding by Customer ---
+  const custCount={};
+  data.forEach(d=>{
+    const c=d.cust||'Unknown';
+    custCount[c]=(custCount[c]||0)+d.findings.length;
+  });
+  const custSorted=Object.entries(custCount).sort((a,b)=>b[1]-a[1]);
+  const custLabels=custSorted.map(x=>x[0]);
+  const custVals=custSorted.map(x=>x[1]);
+  const custTotal=custVals.reduce((a,b)=>a+b,0);
+  let cum=0;
+  const custCumPct=custVals.map(v=>{cum+=v;return custTotal>0?Math.round(cum/custTotal*100):0;});
+
+  destroyChart('pareto');
+  chartInst['pareto']=new Chart(document.getElementById('paretoChart'),{
+    data:{
+      labels:custLabels,
+      datasets:[
+        {type:'bar',label:'Findings',data:custVals,backgroundColor:COLORS.navy,borderRadius:3,yAxisID:'y'},
+        {type:'line',label:'Cumulative %',data:custCumPct,borderColor:COLORS.gold,backgroundColor:'transparent',borderWidth:2,pointRadius:3,pointBackgroundColor:COLORS.gold,yAxisID:'y2',tension:0.3}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{display:false},ticks:{color:'#888',font:{size:10},maxRotation:45}},
+        y:{grid:{color:'#f0f0f0'},ticks:{color:'#888',font:{size:10}},title:{display:true,text:'Count',font:{size:10},color:'#888'}},
+        y2:{position:'right',min:0,max:100,grid:{display:false},ticks:{color:COLORS.gold,font:{size:10},callback:v=>v+'%'},title:{display:true,text:'Cumulative %',font:{size:10},color:COLORS.gold}}
+      }
+    }
+  });
+
+  // --- PIE: PM Status (Closed vs Pending) ---
+  const closed=data.filter(d=>d.pmStatus==='PM Done'||d.pmStatus==='Audit Pass').length;
+  const pending=data.length-closed;
+  destroyChart('pie');
+  chartInst['pie']=new Chart(document.getElementById('pieChart'),{
+    type:'doughnut',
+    data:{
+      labels:['Closed','Pending'],
+      datasets:[{data:[closed,pending],backgroundColor:[COLORS.teal,COLORS.gold],borderWidth:0}]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+ctx.label+': '+ctx.raw+' ('+Math.round(ctx.raw/data.length*100)+'%)'}}}}
+  });
+  document.getElementById('pie-legend').innerHTML=
+    `<div class="pie-legend-item"><div class="pie-dot" style="background:${COLORS.teal}"></div><span>Closed — ${closed} (${data.length>0?Math.round(closed/data.length*100):0}%)</span></div>
+     <div class="pie-legend-item"><div class="pie-dot" style="background:${COLORS.gold}"></div><span>Pending — ${pending} (${data.length>0?Math.round(pending/data.length*100):0}%)</span></div>`;
+
+  // --- BAR: Station (ICT vs FCT) ---
+  const ict=data.filter(d=>d.proc==='ICT').length;
+  const fct=data.filter(d=>d.proc==='FCT').length;
+  destroyChart('station');
+  chartInst['station']=new Chart(document.getElementById('stationChart'),{
+    type:'bar',
+    data:{labels:['FCT','ICT'],datasets:[{data:[fct,ict],backgroundColor:[COLORS.blue,COLORS.orange],borderRadius:4}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},datalabels:{display:false}},
+      scales:{x:{grid:{display:false},ticks:{color:'#888',font:{size:11}}},y:{display:false}}
+    }
+  });
+
+  // --- PARETO: Action ---
+  const actCount={};
+  allF.forEach(f=>{if(f.action)actCount[f.action]=(actCount[f.action]||0)+1;});
+  const actSorted=Object.entries(actCount).sort((a,b)=>b[1]-a[1]);
+  const actLabels=actSorted.map(x=>ACTION_L[x[0]]||x[0]);
+  const actVals=actSorted.map(x=>x[1]);
+  const actTotal=actVals.reduce((a,b)=>a+b,0);
+  let cum2=0;
+  const actCumPct=actVals.map(v=>{cum2+=v;return actTotal>0?Math.round(cum2/actTotal*100):0;});
+  const actColors=actSorted.map(x=>(ACTION_C[x[0]]||{hex:COLORS.gray}).hex);
+
+  destroyChart('actionPareto');
+  chartInst['actionPareto']=new Chart(document.getElementById('actionParetoChart'),{
+    data:{
+      labels:actLabels,
+      datasets:[
+        {type:'bar',label:'Count',data:actVals,backgroundColor:actColors,borderRadius:3,yAxisID:'y'},
+        {type:'line',label:'Cumulative %',data:actCumPct,borderColor:COLORS.coral,backgroundColor:'transparent',borderWidth:2,pointRadius:3,pointBackgroundColor:COLORS.coral,yAxisID:'y2',tension:0.3}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{display:false},ticks:{color:'#888',font:{size:10},maxRotation:30}},
+        y:{grid:{color:'#f0f0f0'},ticks:{color:'#888',font:{size:10}}},
+        y2:{position:'right',min:0,max:100,grid:{display:false},ticks:{color:COLORS.coral,font:{size:10},callback:v=>v+'%'}}
+      }
+    }
+  });
+
+  // --- PARETO: Finding type ---
+  const findCount={};
+  allF.forEach(f=>{if(f.desc)findCount[f.desc]=(findCount[f.desc]||0)+1;});
+  const findSorted=Object.entries(findCount).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const findLabels=findSorted.map(x=>x[0]);
+  const findVals=findSorted.map(x=>x[1]);
+  const findTotal=findVals.reduce((a,b)=>a+b,0);
+  let cum3=0;
+  const findCumPct=findVals.map(v=>{cum3+=v;return findTotal>0?Math.round(cum3/findTotal*100):0;});
+
+  destroyChart('findingPareto');
+  chartInst['findingPareto']=new Chart(document.getElementById('findingParetoChart'),{
+    data:{
+      labels:findLabels,
+      datasets:[
+        {type:'bar',label:'Count',data:findVals,backgroundColor:COLORS.teal,borderRadius:3,yAxisID:'y'},
+        {type:'line',label:'Cumulative %',data:findCumPct,borderColor:COLORS.purple,backgroundColor:'transparent',borderWidth:2,pointRadius:3,pointBackgroundColor:COLORS.purple,yAxisID:'y2',tension:0.3}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{display:false},ticks:{color:'#888',font:{size:10},maxRotation:30}},
+        y:{grid:{color:'#f0f0f0'},ticks:{color:'#888',font:{size:10}}},
+        y2:{position:'right',min:0,max:100,grid:{display:false},ticks:{color:COLORS.purple,font:{size:10},callback:v=>v+'%'}}
+      }
+    }
+  });
+
+  renderTable();
+}
+
+function renderTable(){
+  const q=(document.getElementById('search-box')?.value||'').toLowerCase();
+  const data=getFiltered().filter(d=>!q||d.id.toLowerCase().includes(q)||d.proj.toLowerCase().includes(q)||(d.cust||'').toLowerCase().includes(q));
+  document.getElementById('detail-body').innerHTML=data.map(d=>{
+    const crit=d.findings.filter(f=>f.action==='A1').length;
+    const acts=[...new Set(d.findings.map(f=>f.action).filter(Boolean))];
+    const tags=acts.map(a=>{const c=ACTION_C[a]||{bg:'#eee',text:'#555'};return`<span class="action-tag" style="background:${c.bg};color:${c.text}">${a}</span>`;}).join('');
+    const procCls=d.proc==='ICT'?'s-audit':'s-ext';
+    const statusCls=d.pmStatus==='PM Done'?'s-done':d.pmStatus==='Audit Pass'?'s-audit':'s-wait';
+    return`<tr>
+      <td style="font-weight:600">${d.en}</td>
+      <td>${d.date}</td>
+      <td class="mono">${d.id}</td>
+      <td>${d.cust||'—'}</td>
+      <td style="font-size:11px">${d.proj||'—'}</td>
+      <td><span class="badge ${procCls}">${d.proc||'—'}</span></td>
+      <td><span class="badge ${statusCls}">${d.pmStatus||'—'}</span></td>
+      <td>${tags||'—'}</td>
+      <td style="color:${crit>0?'#c0392b':'#aaa'};font-weight:${crit>0?'700':'400'}">${crit>0?crit+' item(s)':'—'}</td>
+    </tr>`;
+  }).join('');
+}
+</script>
+</body>
+</html>
