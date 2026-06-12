@@ -1,0 +1,1290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PM Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',system-ui,sans-serif;background:#f0f2f8;color:#1a1a2e;font-size:13px;line-height:1.5}
+
+/* HEADER */
+header{background:#1a1a2e;color:#fff;padding:0 1.5rem;height:54px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200}
+.logo{font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px}
+.logo-dot{width:9px;height:9px;border-radius:50%;background:#f4b942}
+.hdr-right{display:flex;align-items:center;gap:10px}
+#last-upd{font-size:11px;color:#8888aa}
+#refresh-btn{font-size:11px;padding:4px 13px;border-radius:6px;border:1px solid #444;background:transparent;color:#ccc;cursor:pointer;transition:background .15s}
+#refresh-btn:hover{background:#2d2d4e}
+#refresh-btn.loading{opacity:.4;pointer-events:none}
+
+main{max-width:1440px;margin:0 auto;padding:1rem 1.25rem 3rem}
+
+/* URL BAR */
+.url-bar{background:#fff;border-radius:10px;padding:.7rem 1rem;margin-bottom:1rem;display:flex;align-items:center;gap:10px;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+.url-bar input{flex:1;font-size:12px;padding:6px 10px;border-radius:6px;border:1px solid #dde;background:#f7f8fc;color:#1a1a2e;font-family:'DM Mono',monospace}
+.url-bar input:focus{outline:none;border-color:#5b7cf6}
+.url-bar button{font-size:12px;padding:6px 18px;border-radius:6px;border:none;background:#1a1a2e;color:#fff;cursor:pointer;font-weight:600;white-space:nowrap}
+.url-bar button:hover{background:#2d2d4e}
+.url-lbl{font-size:11px;font-weight:600;color:#888;white-space:nowrap}
+.err{background:#fff0f0;color:#c0392b;border-radius:8px;padding:.6rem 1rem;font-size:12px;margin-bottom:1rem;border:1px solid #fcc}
+
+/* FILTERS */
+.filters{display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap;align-items:center}
+.f-lbl{font-size:11px;color:#888;font-weight:600;margin-right:2px}
+.f-btn{font-size:11px;padding:4px 13px;border-radius:20px;border:1px solid #dde;background:#fff;color:#555;cursor:pointer;transition:all .15s}
+.f-btn:hover{border-color:#5b7cf6;color:#5b7cf6}
+.f-btn.active{background:#1a1a2e;color:#fff;border-color:#1a1a2e}
+
+/* METRIC CARDS */
+.metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:1rem}
+.metric{background:#fff;border-radius:10px;padding:.9rem 1.1rem;box-shadow:0 1px 4px rgba(0,0,0,.06);border-top:3px solid transparent}
+.metric-lbl{font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}
+.metric-val{font-size:28px;font-weight:700;line-height:1;margin-bottom:2px}
+.metric-sub{font-size:10px;color:#bbb}
+.m-blue{border-top-color:#5b7cf6}
+.m-green{border-top-color:#27ae60}
+.m-red{border-top-color:#e74c3c}
+.m-amber{border-top-color:#f4b942}
+.m-teal{border-top-color:#2196a6}
+
+/* LAYOUT */
+.row2{display:grid;grid-template-columns:1fr 320px;gap:10px;margin-bottom:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px}
+.card{background:#fff;border-radius:10px;padding:1.1rem 1.25rem;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.card-title{font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.85rem}
+.right-col{display:flex;flex-direction:column;gap:10px}
+
+/* PIE */
+.pie-wrap{display:flex;align-items:center;gap:1rem}
+.pie-legend{display:flex;flex-direction:column;gap:5px}
+.pie-item{display:flex;align-items:center;gap:7px;font-size:12px}
+.pie-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+
+/* TREND */
+.trend-row{display:flex;gap:10px;margin-bottom:10px}
+.trend-row .card{flex:1}
+
+/* TABLE */
+.tbl-card{background:#fff;border-radius:10px;padding:1.1rem 1.25rem;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.tbl-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem}
+.tbl-head-title{font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.06em}
+.search-box{font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid #dde;background:#f7f8fc;width:210px}
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.04em;padding:8px 10px;border-bottom:1.5px solid #eee;text-align:left;white-space:nowrap;background:#fafafa}
+td{padding:8px 10px;border-bottom:1px solid #f3f3f7;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:#f7f8fc}
+
+/* CLICKABLE ID */
+.id-link{font-family:'DM Mono',monospace;font-size:11px;color:#5b7cf6;cursor:pointer;text-decoration:underline;text-underline-offset:2px;font-weight:600}
+.id-link:hover{color:#3a5bd9}
+
+.badge{display:inline-block;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px}
+.act-tag{display:inline-block;font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;margin:1px}
+.mono{font-family:'DM Mono',monospace;font-size:11px}
+
+/* STATUS BADGES */
+.s-done{background:#e8f5e9;color:#2e7d32}
+.s-wait{background:#fff8e1;color:#e65100}
+.s-audit{background:#e3f2fd;color:#1565c0}
+.s-ict{background:#e8eaf6;color:#283593}
+.s-fct{background:#fce4ec;color:#880e4f}
+
+.loader{text-align:center;padding:3rem;color:#888;font-size:13px}
+.nav-btn{font-size:12px;padding:5px 14px;border-radius:6px;border:none;background:transparent;color:#9999bb;cursor:pointer;font-weight:500;transition:all .15s}
+.nav-btn:hover{background:rgba(255,255,255,.1);color:#fff}
+.nav-btn.active{background:rgba(255,255,255,.15);color:#fff;font-weight:600}
+.page{display:none}.page.active{display:block}
+/* Calendar styles */
+.cal-wrap{max-width:1400px;margin:0 auto;padding:1rem 1.25rem 3rem}
+.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;background:#fff;border-radius:10px;padding:.75rem 1.25rem;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.cal-nav-btn{font-size:13px;padding:5px 14px;border-radius:6px;border:1px solid #dde;background:#f7f8fc;cursor:pointer;font-weight:500}
+.cal-nav-btn:hover{background:#eee}
+.cal-month-title{font-size:18px;font-weight:700;color:#1a1a2e}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+.cal-day-name{text-align:center;font-size:10px;font-weight:700;color:#888;text-transform:uppercase;padding:.4rem 0}
+.cal-cell{background:#fff;border-radius:8px;min-height:110px;padding:.5rem;box-shadow:0 1px 3px rgba(0,0,0,.06);border:1.5px solid transparent;cursor:pointer;transition:border .15s}
+.cal-cell:hover{border-color:#5b7cf6}
+.cal-cell.today{border-color:#f4b942!important;background:#fffdf0}
+.cal-cell.other-month{background:#f5f5f8;opacity:.5}
+.cal-cell.has-events{border-color:#c8d8ff}
+.cal-date-num{font-size:12px;font-weight:700;color:#1a1a2e;margin-bottom:4px}
+.cal-date-num.today-num{background:#f4b942;color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px}
+.cal-event{font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;margin-bottom:2px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-more{font-size:9px;color:#888;margin-top:2px}
+/* Event modal */
+.ev-modal{position:fixed;inset:0;background:rgba(10,10,30,.55);z-index:3000;display:flex;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(2px)}
+.ev-modal.hidden{display:none}
+.ev-box{background:#fff;border-radius:12px;width:100%;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,.2);overflow:hidden}
+.ev-head{background:#1a1a2e;padding:.9rem 1.25rem;display:flex;align-items:center;justify-content:space-between}
+.ev-body{padding:1.25rem}
+.ev-input{width:100%;font-size:13px;padding:8px 12px;border-radius:7px;border:1px solid #dde;background:#f7f8fc;margin-bottom:.6rem;box-sizing:border-box}
+.ev-input:focus{outline:none;border-color:#5b7cf6}
+.ev-label{font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+.ev-btn{font-size:12px;padding:7px 16px;border-radius:7px;border:none;cursor:pointer;font-weight:600}
+/* Side panel */
+.cal-side{width:280px;flex-shrink:0}
+.cal-layout{display:flex;gap:12px;align-items:flex-start}
+.upcoming-item{padding:.6rem .75rem;border-radius:7px;margin-bottom:6px;border-left:3px solid #5b7cf6;background:#f7f8fc;cursor:pointer}
+.upcoming-item:hover{background:#eef2ff}
+
+/* ===== MODAL ===== */
+.modal-overlay{position:fixed;inset:0;background:rgba(10,10,30,.55);z-index:1000;display:flex;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(2px)}
+.modal-overlay.hidden{display:none}
+.modal{background:#fff;border-radius:14px;width:100%;max-width:720px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.2);overflow:hidden}
+.modal-header{background:#1a1a2e;color:#fff;padding:1rem 1.25rem;display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-shrink:0}
+.modal-id{font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:#f4b942}
+.modal-meta{font-size:11px;color:#9999bb;margin-top:3px}
+.modal-close{background:transparent;border:none;color:#fff;font-size:20px;cursor:pointer;line-height:1;padding:2px 6px;border-radius:4px;flex-shrink:0}
+.modal-close:hover{background:#333}
+.modal-body{padding:1.25rem;overflow-y:auto;flex:1}
+.modal-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1.25rem}
+.info-item{background:#f7f8fc;border-radius:8px;padding:.6rem .9rem}
+.info-lbl{font-size:10px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
+.info-val{font-size:13px;font-weight:500;color:#1a1a2e}
+.findings-title{font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.6rem}
+.finding-row{display:flex;align-items:flex-start;gap:10px;padding:.65rem .9rem;border-radius:8px;margin-bottom:6px;border:1px solid #f0f0f5}
+.finding-row:hover{background:#f7f8fc}
+.finding-code{font-family:'DM Mono',monospace;font-size:11px;font-weight:700;color:#5b7cf6;min-width:32px}
+.finding-desc{flex:1;font-size:12px;color:#333}
+.finding-sub{font-size:11px;color:#888;margin-top:2px}
+.finding-action{flex-shrink:0}
+.modal-summary{display:flex;gap:8px;flex-wrap:wrap;margin-top:1rem;padding-top:1rem;border-top:1px solid #f0f0f5}
+.summary-chip{font-size:11px;font-weight:600;padding:4px 12px;border-radius:20px}
+</style>
+</head>
+<body>
+
+<header>
+  <div style="display:flex;align-items:center;gap:1.5rem">
+    <div class="logo"><div class="logo-dot"></div>Preventive Maintenance</div>
+    <nav style="display:flex;gap:4px">
+      <button class="nav-btn active" id="nav-dashboard" onclick="switchPage('dashboard')">📊 Dashboard</button>
+      <button class="nav-btn" id="nav-calendar" onclick="switchPage('calendar')">📅 PM Calendar</button>
+    </nav>
+  </div>
+  <div class="hdr-right">
+    <span id="last-upd">Not loaded</span>
+    <button onclick="openSignOff()" style="font-size:11px;padding:4px 14px;border-radius:6px;border:1px solid #f4b942;background:transparent;color:#f4b942;cursor:pointer;font-weight:600">✍ Sign-Off Report</button>
+    <button id="refresh-btn" onclick="loadData()">↻ Refresh</button>
+  </div>
+</header>
+
+<!-- PAGE: DASHBOARD -->
+<div id="page-dashboard" class="page active">
+<main>
+  <div class="url-bar">
+    <span class="url-lbl">Apps Script URL</span>
+    <input type="text" id="api-url" placeholder="https://script.google.com/macros/s/YOUR_ID/exec"/>
+    <button onclick="saveAndLoad()">Load Data</button>
+  </div>
+  <div id="err-box"></div>
+  <div id="loader" class="loader">Paste your Apps Script URL above and click Load Data</div>
+
+  <div id="dashboard" style="display:none">
+
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:1rem;background:#fff;border-radius:10px;padding:.75rem 1rem;box-shadow:0 1px 4px rgba(0,0,0,.06)">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="f-lbl">Customer</span>
+        <select id="cust-select" onchange="setCust(this.value)" style="font-size:12px;padding:5px 28px 5px 10px;border-radius:6px;border:1px solid #dde;background:#f7f8fc;color:#1a1a2e;cursor:pointer;appearance:none;background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 12 12%22><path fill=%22%23888%22 d=%22M6 8L1 3h10z%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;min-width:130px">
+          <option value="all">All Customers</option>
+        </select>
+      </div>
+      <div style="width:1px;height:24px;background:#eee"></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="f-lbl">Station</span>
+        <button class="f-btn active" id="proc-all" onclick="setProc('all',this)">All</button>
+        <button class="f-btn" id="proc-ict" onclick="setProc('ICT',this)">ICT</button>
+        <button class="f-btn" id="proc-fct" onclick="setProc('FCT',this)">FCT</button>
+      </div>
+      <div style="width:1px;height:24px;background:#eee"></div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span class="f-lbl">Date Range</span>
+        <button class="f-btn active" id="date-all" onclick="setDateRange('all',this)">All</button>
+        <button class="f-btn" id="date-ww" onclick="setDateRange('ww',this)">Work Week</button>
+        <button class="f-btn" id="date-month" onclick="setDateRange('month',this)">This Month</button>
+        <button class="f-btn" id="date-custom" onclick="setDateRange('custom',this)">Custom</button>
+        <div id="custom-date-inputs" style="display:none;gap:6px;align-items:center">
+          <input type="date" id="date-from" onchange="applyCustomDate()" style="font-size:11px;padding:4px 8px;border-radius:6px;border:1px solid #dde;background:#fff">
+          <span style="font-size:11px;color:#888">to</span>
+          <input type="date" id="date-to" onchange="applyCustomDate()" style="font-size:11px;padding:4px 8px;border-radius:6px;border:1px solid #dde;background:#fff">
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI -->
+    <div class="metrics" id="metrics"></div>
+
+    <!-- ROW 1: Finding/Action/Trend Pareto -->
+    <div class="row3">
+      <div class="card">
+        <div class="card-title">Finding Type</div>
+        <div style="position:relative;height:220px"><canvas id="fPareto" role="img" aria-label="Pareto finding types"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Action Required</div>
+        <div style="position:relative;height:220px"><canvas id="aPareto" role="img" aria-label="Pareto action required"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Trend — Findings by Date</div>
+        <div style="position:relative;height:220px"><canvas id="trendC" role="img" aria-label="Trend findings by date"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ROW 2: Customer Pareto + Pie + Station -->
+    <div class="row2">
+      <div class="card">
+        <div class="card-title">Equipment by Customer (unique IDs)</div>
+        <div style="position:relative;height:260px"><canvas id="cPareto" role="img" aria-label="Pareto findings by customer"></canvas></div>
+      </div>
+      <div class="right-col">
+        <div class="card" style="flex:1">
+          <div class="card-title">PM Status</div>
+          <div class="pie-wrap">
+            <div style="position:relative;width:110px;height:110px;flex-shrink:0"><canvas id="pieC" role="img" aria-label="PM status pie"></canvas></div>
+            <div class="pie-legend" id="pie-leg"></div>
+          </div>
+        </div>
+        <div class="card" style="flex:1">
+          <div class="card-title">Station Test</div>
+          <div style="position:relative;height:90px"><canvas id="stationC" role="img" aria-label="Station ICT FCT"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TABLE -->
+    <div class="tbl-card">
+      <div class="tbl-head">
+        <span class="tbl-head-title">Equipment List — Click ID to view Findings</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input class="search-box" type="text" id="srch" placeholder="Search ID, Project, Customer..." oninput="renderTable()">
+          <button onclick="exportExcel()" style="font-size:11px;padding:6px 14px;border-radius:6px;border:none;background:#27ae60;color:#fff;cursor:pointer;font-weight:600;white-space:nowrap">
+            Export Excel
+          </button>
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th onclick="sortTable('id')" style="cursor:pointer">Asset ID <span id="sort-id">↕</span></th>
+            <th onclick="sortTable('en')" style="cursor:pointer">EN <span id="sort-en">↕</span></th>
+            <th onclick="sortTable('date')" style="cursor:pointer">Date <span id="sort-date">↕</span></th>
+            <th onclick="sortTable('cust')" style="cursor:pointer">Customer <span id="sort-cust">↕</span></th>
+            <th onclick="sortTable('proj')" style="cursor:pointer">Project <span id="sort-proj">↕</span></th>
+            <th onclick="sortTable('proc')" style="cursor:pointer">Proc <span id="sort-proc">↕</span></th>
+            <th onclick="sortTable('pmStatus')" style="cursor:pointer">PM Status <span id="sort-pmStatus">↕</span></th>
+            <th>Findings</th>
+            <th onclick="sortTable('crit')" style="cursor:pointer">Critical A1 <span id="sort-crit">↕</span></th>
+          </tr></thead>
+          <tbody id="tbl-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</main>
+</div><!-- end page-dashboard -->
+
+<!-- PAGE: CALENDAR -->
+<div id="page-calendar" class="page">
+<div class="cal-wrap">
+  <div class="cal-header">
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="cal-nav-btn" onclick="calNav(-1)">‹ Prev</button>
+      <span class="cal-month-title" id="cal-title">—</span>
+      <button class="cal-nav-btn" onclick="calNav(1)">Next ›</button>
+      <button class="cal-nav-btn" onclick="goToday()" style="background:#1a1a2e;color:#fff;border-color:#1a1a2e">Today</button>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="cal-nav-btn active" id="view-month" onclick="setView('month',this)">Month</button>
+      <button class="cal-nav-btn" id="view-week" onclick="setView('week',this)">Week</button>
+      <button onclick="openAddEvent(null)" style="font-size:12px;padding:6px 16px;border-radius:7px;border:none;background:#5b7cf6;color:#fff;cursor:pointer;font-weight:600">+ Add PM Plan</button>
+    </div>
+  </div>
+  <div class="cal-layout">
+    <div style="flex:1;min-width:0">
+      <div class="cal-grid" id="cal-day-names" style="margin-bottom:6px"></div>
+      <div class="cal-grid" id="cal-grid"></div>
+    </div>
+    <div class="cal-side">
+      <div style="background:#fff;border-radius:10px;padding:1rem;box-shadow:0 1px 4px rgba(0,0,0,.06);margin-bottom:10px">
+        <div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.75rem">Upcoming PM</div>
+        <div id="upcoming-list"><div style="color:#bbb;font-size:12px">No upcoming plans</div></div>
+      </div>
+      <div style="background:#fff;border-radius:10px;padding:1rem;box-shadow:0 1px 4px rgba(0,0,0,.06)">
+        <div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.75rem">Summary</div>
+        <div id="cal-summary"></div>
+      </div>
+    </div>
+  </div>
+</div>
+</div><!-- end page-calendar -->
+
+<!-- EVENT MODAL -->
+<div class="ev-modal hidden" id="ev-modal">
+  <div class="ev-box">
+    <div class="ev-head">
+      <span style="font-size:14px;font-weight:700;color:#fff" id="ev-modal-title">Add PM Plan</span>
+      <button onclick="closeEvModal()" style="background:transparent;border:none;color:#fff;font-size:20px;cursor:pointer">✕</button>
+    </div>
+    <div class="ev-body">
+      <input type="hidden" id="ev-id">
+      <div class="ev-label">Customer</div>
+      <input class="ev-input" id="ev-cust" placeholder="e.g. ABR, ABI, VET">
+      <div class="ev-label">Equipment ID / Asset</div>
+      <input class="ev-input" id="ev-asset" placeholder="e.g. A5215263">
+      <div class="ev-label">Project / Description</div>
+      <input class="ev-input" id="ev-proj" placeholder="e.g. 207-319LF — ICT Fixture PM">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><div class="ev-label">PM Date</div><input class="ev-input" type="date" id="ev-date"></div>
+        <div><div class="ev-label">Process</div>
+          <select class="ev-input" id="ev-proc">
+            <option value="ICT">ICT</option><option value="FCT">FCT</option><option value="Both">Both</option>
+          </select>
+        </div>
+      </div>
+      <div class="ev-label">Engineer (EN)</div>
+      <input class="ev-input" id="ev-en" placeholder="e.g. 55408">
+      <div class="ev-label">Status</div>
+      <select class="ev-input" id="ev-status">
+        <option value="Planned">🔵 Planned</option>
+        <option value="In Progress">🟡 In Progress</option>
+        <option value="Done">🟢 Done</option>
+        <option value="Postponed">🔴 Postponed</option>
+      </select>
+      <div class="ev-label">Note</div>
+      <input class="ev-input" id="ev-note" placeholder="Optional note">
+      <div style="display:flex;justify-content:space-between;margin-top:.75rem">
+        <button id="ev-delete-btn" class="ev-btn" style="background:#fdecea;color:#c0392b;display:none" onclick="deleteEvent()">Delete</button>
+        <div style="display:flex;gap:8px;margin-left:auto">
+          <button class="ev-btn" style="background:#f0f0f5;color:#555" onclick="closeEvModal()">Cancel</button>
+          <button class="ev-btn" style="background:#5b7cf6;color:#fff" onclick="saveEvent()">Save Plan</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay hidden" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal" id="modal-box">
+    <div class="modal-header">
+      <div>
+        <div class="modal-id" id="m-id">—</div>
+        <div class="modal-meta" id="m-meta">—</div>
+      </div>
+      <button class="modal-close" onclick="hideModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-info-grid" id="m-info"></div>
+      <div class="findings-title">Findings & Actions</div>
+      <div id="m-findings"></div>
+      <div class="modal-summary" id="m-summary"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const C={navy:'#1a1a2e',gold:'#f4b942',teal:'#2196a6',coral:'#e74c3c',green:'#27ae60',purple:'#7c5cbf',blue:'#5b7cf6',gray:'#8e8e9e',orange:'#e67e22',pink:'#d81b7a'};
+const AC={
+  A1:{bg:'#fdecea',text:'#c0392b',hex:'#e74c3c'},
+  A2:{bg:'#fff8e1',text:'#e65100',hex:'#f4b942'},
+  A3:{bg:'#e3f2fd',text:'#1565c0',hex:'#5b7cf6'},
+  A4:{bg:'#f3e5f5',text:'#6a1b9a',hex:'#7c5cbf'},
+  A5:{bg:'#e8f5e9',text:'#2e7d32',hex:'#27ae60'},
+  A6:{bg:'#e0f7fa',text:'#00695c',hex:'#26a69a'},
+  A7:{bg:'#e8eaf6',text:'#283593',hex:'#5c6bc0'},
+  A8:{bg:'#fce4ec',text:'#880e4f',hex:'#ec407a'},
+  A9:{bg:'#fff3e0',text:'#e65100',hex:'#ff9800'},
+  A10:{bg:'#e8f5e9',text:'#1b5e20',hex:'#43a047'},
+  A11:{bg:'#e3f2fd',text:'#0d47a1',hex:'#1e88e5'},
+  A12:{bg:'#fafafa',text:'#424242',hex:'#9e9e9e'},
+  A13:{bg:'#fff8e1',text:'#f57f17',hex:'#ffb300'},
+  A14:{bg:'#e8eaf6',text:'#3949ab',hex:'#7986cb'},
+  A15:{bg:'#e0f2f1',text:'#004d40',hex:'#26a69a'},
+  A24:{bg:'#ede7f6',text:'#6a1b9a',hex:'#ab47bc'},
+  A38:{bg:'#e8f5e9',text:'#1b5e20',hex:'#66bb6a'},
+  A39:{bg:'#fdecea',text:'#b71c1c',hex:'#ef5350'},
+};
+// Default for unknown action codes
+function getAC(a){return AC[a]||{bg:'#f5f5f5',text:'#666',hex:'#aaa'};}
+const AL={
+  A1:'Corrective Action',A2:'Spare Part',A3:'Label Required',A4:'Replacement',
+  A5:'Cleaned',A6:'Label Removed',A7:'Wires Secured',A8:'Removed Excess Slack',
+  A9:'Wires Reorganized',A10:'Cables Rerouted (Airflow)',A11:'Cables Rerouted (Layout)',
+  A12:'Screw Replaced',A13:'Connector Replaced',A14:'Label Replaced',A15:'Tightened Loose Screw',
+  A16:'Rail Cover Replaced',A17:'Connector Cover Replaced',A18:'Drive Bay Cover Replaced',
+  A19:'Nut Replaced',A20:'Spring Replaced',A21:'Fixture Pole Replaced',A22:'Button Replaced',
+  A23:'Pole Replaced',A24:'Replaced',A25:'Clamps Added',A26:'Cables Bundled',
+  A27:'Cables Routed',A28:'Cables Secured (Vents)',A29:'Secured to Path',
+  A30:'ESD Material Replaced',A31:'Filter Pad Replaced',A32:'Removal Required',
+  A33:'Wires Re-fastened',A34:'Cables Adjusted',A35:'Cable Layout Improved',
+  A36:'Ventilation Cleared',A37:'Cable Direction Corrected',A38:'Audit Pass',A39:'Audit Fail'
+};
+const BAR_PALETTE=['#1a1a2e','#2196a6','#5b7cf6','#f4b942','#27ae60','#e74c3c','#7c5cbf','#e67e22','#d81b7a','#8e8e9e'];
+
+let allData=[],grouped=[],currentCust='all',currentProc='all';
+let ci={};
+let sortKey='date',sortDir=1;
+let dateMode='all',dateFrom=null,dateTo=null;
+
+function parseDate(str){
+  // dd/MM/yyyy
+  if(!str)return null;
+  const p=str.split('/');
+  if(p.length===3)return new Date(p[2],p[1]-1,p[0]);
+  return new Date(str);
+}
+
+function setDateRange(mode,btn){
+  dateMode=mode;
+  document.querySelectorAll('#date-all,#date-ww,#date-month,#date-custom').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const ci=document.getElementById('custom-date-inputs');
+  if(mode==='custom'){ci.style.display='flex';return;}
+  ci.style.display='none';
+  const now=new Date();
+  if(mode==='ww'){
+    // Work week = Mon-Sun of current week
+    const day=now.getDay()||7;
+    dateFrom=new Date(now);dateFrom.setDate(now.getDate()-day+1);dateFrom.setHours(0,0,0,0);
+    dateTo=new Date(dateFrom);dateTo.setDate(dateFrom.getDate()+6);dateTo.setHours(23,59,59,999);
+  } else if(mode==='month'){
+    dateFrom=new Date(now.getFullYear(),now.getMonth(),1);
+    dateTo=new Date(now.getFullYear(),now.getMonth()+1,0,23,59,59,999);
+  } else {
+    dateFrom=null;dateTo=null;
+  }
+  render();
+}
+
+function applyCustomDate(){
+  const f=document.getElementById('date-from').value;
+  const t=document.getElementById('date-to').value;
+  if(f)dateFrom=new Date(f);
+  if(t){dateTo=new Date(t);dateTo.setHours(23,59,59,999);}
+  render();
+}
+
+function saveAndLoad(){const u=document.getElementById('api-url').value.trim();if(u){localStorage.setItem('pm_url',u);loadData();}}
+window.onload=()=>{const s=localStorage.getItem('pm_url');if(s){document.getElementById('api-url').value=s;loadData();}};
+
+function loadData(){
+  const url=document.getElementById('api-url').value.trim();if(!url)return;
+  const btn=document.getElementById('refresh-btn');
+  btn.classList.add('loading');btn.textContent='⟳ Loading…';
+  document.getElementById('err-box').innerHTML='';
+  const old=document.getElementById('_jscb');if(old)old.remove();
+  window._pmCB=function(json){
+    allData=json.data||[];grouped=groupEq(allData);
+    document.getElementById('last-upd').textContent='Updated: '+new Date(json.updated).toLocaleTimeString('en-GB');
+    buildFilters();render();
+    document.getElementById('dashboard').style.display='block';
+    document.getElementById('loader').style.display='none';
+    btn.classList.remove('loading');btn.textContent='↻ Refresh';
+  };
+  fetch(url).then(r=>r.json()).then(j=>window._pmCB(j)).catch(()=>{
+    const s=document.createElement('script');s.id='_jscb';
+    s.onerror=()=>{document.getElementById('err-box').innerHTML='<div class="err">⚠ Cannot load data — Check URL and Deploy settings (JSONP)</div>';document.getElementById('loader').style.display='none';btn.classList.remove('loading');btn.textContent='↻ Refresh';};
+    s.src=url+(url.includes('?')?'&':'?')+'callback=_pmCB&t='+Date.now();
+    document.head.appendChild(s);
+  });
+}
+
+function fmtDate(d){
+  if(!d)return'—';
+  // Try parsing as Date object string or ISO
+  const dt=new Date(d);
+  if(!isNaN(dt)){
+    const day=String(dt.getDate()).padStart(2,'0');
+    const mon=String(dt.getMonth()+1).padStart(2,'0');
+    const yr=dt.getFullYear();
+    return day+'/'+mon+'/'+yr;
+  }
+  // Already formatted dd/MM/yyyy
+  return d;
+}
+function groupEq(rows){
+  const m={};
+  rows.forEach(r=>{
+    const k=r.en+'|'+r.id+'|'+r.date;
+    if(!m[k])m[k]={en:r.en,date:fmtDate(r.date),id:r.id,cust:r.cust,proj:r.proj,proc:r.proc,loc:r.loc,pmStatus:r.pmStatus,findings:[]};
+    if(r.finding||r.action)m[k].findings.push({code:r.finding,desc:r.mainFinding,action:r.action,sub:r.subFinding||''});
+  });
+  return Object.values(m);
+}
+
+function getFiltered(){
+  return grouped.filter(d=>{
+    if(currentCust!=='all'&&d.cust!==currentCust)return false;
+    if(currentProc!=='all'&&d.proc!==currentProc)return false;
+    if(dateFrom||dateTo){
+      const dt=parseDate(d.date);
+      if(dateFrom&&dt<dateFrom)return false;
+      if(dateTo&&dt>dateTo)return false;
+    }
+    return true;
+  });
+}
+function setProc(p,btn){
+  currentProc=p;
+  document.querySelectorAll('#proc-all,#proc-ict,#proc-fct').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+}
+
+function buildFilters(){
+  const custs=[...new Set(grouped.map(d=>d.cust||'Unknown'))].sort();
+  const sel=document.getElementById('cust-select');
+  sel.innerHTML='<option value="all">All Customers</option>';
+  custs.forEach(c=>{
+    const o=document.createElement('option');
+    o.value=c;o.textContent=c;
+    if(c===currentCust)o.selected=true;
+    sel.appendChild(o);
+  });
+}
+function setCust(val){
+  currentCust=val;
+  render();
+}
+
+function dc(id){if(ci[id]){ci[id].destroy();delete ci[id];}}
+
+function mkPareto(canvasId,labels,vals,barColor,lineColor){
+  dc(canvasId);
+  const total=vals.reduce((a,b)=>a+b,0);let cum=0;
+  const cumPct=vals.map(v=>{cum+=v;return total>0?Math.round(cum/total*100):0;});
+  ci[canvasId]=new Chart(document.getElementById(canvasId),{
+    data:{labels,datasets:[
+      {type:'bar',label:'Count',data:vals,backgroundColor:barColor,borderRadius:3,yAxisID:'y',
+        datalabels:{display:true,anchor:'end',align:'top',color:'#444',font:{size:10,weight:'600'},formatter:v=>v}},
+      {type:'line',label:'Cumulative %',data:cumPct,borderColor:lineColor,backgroundColor:'transparent',borderWidth:2,pointRadius:3,pointBackgroundColor:lineColor,yAxisID:'y2',tension:0.3,
+        datalabels:{display:false}}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},datalabels:{display:false}},
+      scales:{
+        x:{grid:{display:false},ticks:{color:'#999',font:{size:10},maxRotation:40}},
+        y:{grid:{color:'#f0f0f5'},ticks:{color:'#999',font:{size:10}},
+           afterDataLimits(axis){axis.max=axis.max*1.15;}},
+        y2:{position:'right',min:0,max:100,grid:{display:false},ticks:{color:lineColor,font:{size:10},callback:v=>v+'%'}}
+      }
+    },
+    plugins:[ChartDataLabels]
+  });
+}
+
+function render(){
+  const data=getFiltered();
+  const allF=data.flatMap(d=>d.findings);
+  const critical=allF.filter(f=>f.action==='A1').length;
+  const pmDone=data.filter(d=>d.pmStatus==='PM Done').length;
+  const auditPass=data.filter(d=>d.pmStatus==='Audit Pass').length;
+  const waiting=data.filter(d=>d.pmStatus!=='PM Done'&&d.pmStatus!=='Audit Pass').length;
+
+  document.getElementById('metrics').innerHTML=`
+    <div class="metric m-blue"><div class="metric-lbl">Equipment</div><div class="metric-val">${data.length}</div><div class="metric-sub">units inspected</div></div>
+    <div class="metric m-green"><div class="metric-lbl">PM Done</div><div class="metric-val" style="color:#27ae60">${pmDone}</div><div class="metric-sub">completed</div></div>
+    <div class="metric m-teal"><div class="metric-lbl">Audit Pass</div><div class="metric-val" style="color:#2196a6">${auditPass}</div><div class="metric-sub">passed audit</div></div>
+    <div class="metric m-amber"><div class="metric-lbl">Waiting PM</div><div class="metric-val" style="color:#e67e22">${waiting}</div><div class="metric-sub">pending</div></div>
+    <div class="metric m-red"><div class="metric-lbl">Critical A1</div><div class="metric-val" style="color:#e74c3c">${critical}</div><div class="metric-sub">corrective action</div></div>
+  `;
+
+  // Customer chart — count unique equipment IDs
+  const cc={};data.forEach(d=>{const c=d.cust||'Unknown';if(!cc[c])cc[c]=new Set();cc[c].add(d.id);});
+  const cs=Object.entries(cc).map(([k,v])=>[k,v.size]).sort((a,b)=>b[1]-a[1]);
+  mkPareto('cPareto',cs.map(x=>x[0]),cs.map(x=>x[1]),cs.map((_,i)=>BAR_PALETTE[i%BAR_PALETTE.length]),C.gold);
+
+  // Pie
+  const closed=pmDone+auditPass;const pending=data.length-closed;
+  dc('pieC');
+  ci['pieC']=new Chart(document.getElementById('pieC'),{type:'doughnut',
+    data:{labels:['PM Done','Audit Pass','Pending'],datasets:[{data:[pmDone,auditPass,pending],backgroundColor:[C.green,C.teal,C.gold],borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+ctx.label+': '+ctx.raw}}}}
+  });
+  document.getElementById('pie-leg').innerHTML=
+    `<div class="pie-item"><div class="pie-dot" style="background:${C.green}"></div><span>PM Done — ${pmDone}</span></div>
+     <div class="pie-item"><div class="pie-dot" style="background:${C.teal}"></div><span>Audit Pass — ${auditPass}</span></div>
+     <div class="pie-item"><div class="pie-dot" style="background:${C.gold}"></div><span>Pending — ${pending}</span></div>`;
+
+  // Station
+  const ict=data.filter(d=>d.proc==='ICT').length,fct=data.filter(d=>d.proc==='FCT').length;
+  dc('stationC');
+  ci['stationC']=new Chart(document.getElementById('stationC'),{type:'bar',
+    data:{labels:['FCT','ICT'],datasets:[{data:[fct,ict],backgroundColor:[C.pink,C.blue],borderRadius:5,
+      datalabels:{display:true,anchor:'end',align:'top',color:'#444',font:{size:11,weight:'600'}}}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},datalabels:{display:false}},
+      scales:{x:{grid:{display:false},ticks:{color:'#999',font:{size:11}}},y:{display:false,afterDataLimits(a){a.max=a.max*1.3;}}}},
+    plugins:[ChartDataLabels]
+  });
+
+  // Pareto Action
+  const ac={};allF.forEach(f=>{if(f.action)ac[f.action]=(ac[f.action]||0)+1;});
+  const as=Object.entries(ac).sort((a,b)=>b[1]-a[1]);
+  mkPareto('aPareto',as.map(x=>AL[x[0]]||x[0]),as.map(x=>x[1]),as.map(x=>getAC(x[0]).hex),C.coral);
+
+  // Pareto Finding
+  const fc={};allF.forEach(f=>{if(f.desc)fc[f.desc]=(fc[f.desc]||0)+1;});
+  const fs=Object.entries(fc).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  mkPareto('fPareto',fs.map(x=>x[0]),fs.map(x=>x[1]),C.teal,C.purple);
+
+  // Trend
+  const tc={};data.forEach(d=>{tc[d.date]=(tc[d.date]||0)+d.findings.length;});
+  const ts=Object.entries(tc).sort((a,b)=>a[0].localeCompare(b[0]));
+  dc('trendC');
+  ci['trendC']=new Chart(document.getElementById('trendC'),{type:'line',
+    data:{labels:ts.map(x=>x[0]),datasets:[{label:'Findings',data:ts.map(x=>x[1]),borderColor:C.blue,backgroundColor:'rgba(91,124,246,.1)',borderWidth:2,pointRadius:4,pointBackgroundColor:C.blue,fill:true,tension:0.3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{grid:{display:false},ticks:{color:'#999',font:{size:10}}},y:{grid:{color:'#f0f0f5'},ticks:{color:'#999',font:{size:10}}}}}
+  });
+
+  renderTable();
+}
+
+function exportExcel(){
+  const q=(document.getElementById('srch')?.value||'').toLowerCase();
+  let data=getFiltered().filter(d=>!q||d.id.toLowerCase().includes(q)||(d.proj||'').toLowerCase().includes(q)||(d.cust||'').toLowerCase().includes(q));
+
+  // Build rows — one row per finding
+  const wsData=[['Asset ID','EN','Date','Customer','Project','Location','Process','PM Status','Finding','Action','Sub Finding']];
+
+  data.forEach(d=>{
+    if(d.findings.length===0){
+      wsData.push([d.id,d.en,d.date,d.cust,d.proj,d.loc,d.proc,d.pmStatus,'','','']);
+    } else {
+      d.findings.forEach((f,i)=>{
+        wsData.push([
+          i===0?d.id:'',
+          i===0?d.en:'',
+          i===0?d.date:'',
+          i===0?d.cust:'',
+          i===0?d.proj:'',
+          i===0?d.loc:'',
+          i===0?d.proc:'',
+          i===0?d.pmStatus:'',
+          f.desc||'',
+          AL[f.action]||f.action||'',
+          f.sub||''
+        ]);
+      });
+    }
+  });
+
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet(wsData);
+
+  // Column widths
+  ws['!cols']=[
+    {wch:14},{wch:8},{wch:12},{wch:10},{wch:18},{wch:8},{wch:8},{wch:12},{wch:22},{wch:24},{wch:36}
+  ];
+
+  // Style header row bold (basic)
+  const range=XLSX.utils.decode_range(ws['!ref']);
+  for(let c=range.s.c;c<=range.e.c;c++){
+    const addr=XLSX.utils.encode_cell({r:0,c});
+    if(!ws[addr])continue;
+    ws[addr].s={font:{bold:true},fill:{fgColor:{rgb:'1A1A2E'}},alignment:{horizontal:'center'}};
+  }
+
+  XLSX.utils.book_append_sheet(wb,ws,'Equipment List');
+
+  // Summary sheet
+  const sumData=[['Customer','Equipment (IDs)','Total Findings','Critical A1']];
+  const custMap={};
+  getFiltered().forEach(d=>{
+    if(!custMap[d.cust])custMap[d.cust]={ids:new Set(),findings:0,critical:0};
+    custMap[d.cust].ids.add(d.id);
+    custMap[d.cust].findings+=d.findings.length;
+    custMap[d.cust].critical+=d.findings.filter(f=>f.action==='A1').length;
+  });
+  Object.entries(custMap).sort((a,b)=>b[1].ids.size-a[1].ids.size).forEach(([c,v])=>{
+    sumData.push([c,v.ids.size,v.findings,v.critical]);
+  });
+  const ws2=XLSX.utils.aoa_to_sheet(sumData);
+  ws2['!cols']=[{wch:14},{wch:16},{wch:16},{wch:14}];
+  XLSX.utils.book_append_sheet(wb,ws2,'Summary');
+
+  // Filename with date
+  const now=new Date();
+  const fname=`PM_Dashboard_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}.xlsx`;
+  XLSX.writeFile(wb,fname);
+}
+
+function sortTable(key){
+  if(sortKey===key) sortDir*=-1; else {sortKey=key;sortDir=1;}
+  document.querySelectorAll('th span[id^="sort-"]').forEach(s=>s.textContent='↕');
+  const el=document.getElementById('sort-'+key);
+  if(el) el.textContent=sortDir===1?'↑':'↓';
+  renderTable();
+}
+function renderTable(){
+  const q=(document.getElementById('srch')?.value||'').toLowerCase();
+  let data=getFiltered().filter(d=>!q||d.id.toLowerCase().includes(q)||(d.proj||'').toLowerCase().includes(q)||(d.cust||'').toLowerCase().includes(q));
+  data=[...data].sort((a,b)=>{
+    let av=sortKey==='crit'?a.findings.filter(f=>f.action==='A1').length:(a[sortKey]||'');
+    let bv=sortKey==='crit'?b.findings.filter(f=>f.action==='A1').length:(b[sortKey]||'');
+    if(typeof av==='string') return av.localeCompare(bv)*sortDir;
+    return(av-bv)*sortDir;
+  });
+  document.getElementById('tbl-body').innerHTML=data.map(d=>{
+    const crit=d.findings.filter(f=>f.action==='A1').length;
+    const findingNames=[...new Set(d.findings.map(f=>f.desc).filter(Boolean))].slice(0,3);
+    const tags=findingNames.map(t=>`<span class="act-tag" style="background:#f0f0f5;color:#444">${t}</span>`).join('')
+      + (d.findings.length>3?` <span style="font-size:10px;color:#aaa">+${d.findings.length-3} more</span>`:'');
+    const pCls=d.proc==='ICT'?'s-ict':'s-fct';
+    const sCls=d.pmStatus==='PM Done'?'s-done':d.pmStatus==='Audit Pass'?'s-audit':'s-wait';
+    return`<tr>
+      <td><span class="id-link" onclick="showModal('${d.en}|${d.id}|${d.date}')">${d.id}</span></td>
+      <td style="font-weight:600">${d.en}</td>
+      <td>${d.date}</td>
+      <td>${d.cust||'—'}</td>
+      <td style="font-size:11px;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${d.proj||'—'}</td>
+      <td><span class="badge ${pCls}">${d.proc||'—'}</span></td>
+      <td><span class="badge ${sCls}">${d.pmStatus||'—'}</span></td>
+      <td>${tags||'—'}</td>
+      <td style="color:${crit>0?'#e74c3c':'#bbb'};font-weight:${crit>0?'700':'400'}">${crit>0?crit+' item':'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+
+// ===== SIGN-OFF =====
+const AC_PILL = {
+  A1:{bg:'#fdecea',text:'#c0392b'}, A2:{bg:'#fff8e1',text:'#e65100'},
+  A3:{bg:'#e3f2fd',text:'#1565c0'}, A4:{bg:'#f3e5f5',text:'#6a1b9a'},
+  A5:{bg:'#e8f5e9',text:'#2e7d32'}, A38:{bg:'#e8f5e9',text:'#1b5e20'},
+};
+function getAcPill(a){return AC_PILL[a]||{bg:'#f5f5f5',text:'#666'};}
+
+function openSignOff(){
+  // Populate filter dropdowns
+  const custs=[...new Set(grouped.map(d=>d.cust).filter(Boolean))].sort();
+  const ens=[...new Set(grouped.map(d=>d.en).filter(Boolean))].sort();
+  const dates=[...new Set(grouped.map(d=>d.date).filter(Boolean))].sort();
+
+  const sc=document.getElementById('so-cust-filter');
+  sc.innerHTML='<option value="all">All Customers</option>'+custs.map(c=>`<option value="${c}">${c}</option>`).join('');
+
+  const se=document.getElementById('so-en-filter');
+  se.innerHTML='<option value="all">All Engineers</option>'+ens.map(e=>`<option value="${e}">EN ${e}</option>`).join('');
+
+  const sd=document.getElementById('so-date-filter');
+  sd.innerHTML='<option value="all">All Dates</option>'+dates.map(d=>`<option value="${d}">${d}</option>`).join('');
+
+  document.getElementById('signoff-overlay').style.display='block';
+  document.body.style.overflow='hidden';
+  renderSignOff();
+}
+function closeSignOff(){
+  document.getElementById('signoff-overlay').style.display='none';
+  document.body.style.overflow='';
+}
+function printSignOff(){window.print();}
+
+function renderSignOff(){
+  const fCust=document.getElementById('so-cust-filter').value;
+  const fEN=document.getElementById('so-en-filter').value;
+  const fProc=document.getElementById('so-proc-filter').value;
+  const fDate=document.getElementById('so-date-filter').value;
+
+  const data=grouped.filter(d=>
+    (fCust==='all'||d.cust===fCust)&&
+    (fEN==='all'||d.en===fEN)&&
+    (fProc==='all'||d.proc===fProc)&&
+    (fDate==='all'||d.date===fDate)
+  );
+
+  const now=new Date().toLocaleDateString('en-GB');
+  document.getElementById('so-subtitle').textContent=
+    `${data.length} equipment  ·  ${data.reduce((s,d)=>s+d.findings.length,0)} findings  ·  Generated: ${now}`;
+
+  if(data.length===0){
+    document.getElementById('so-content').innerHTML='<div style="text-align:center;padding:2rem;color:#aaa">No data matches the selected filters</div>';
+    return;
+  }
+
+  // Build one big Excel-style table
+  const totalFindings = data.reduce((s,d)=>s+d.findings.length,0);
+  const totalCritical = data.reduce((s,d)=>s+d.findings.filter(f=>f.action==='A1').length,0);
+
+  let html=`
+    <!-- Report Title -->
+    <div style="margin-bottom:1.25rem">
+      <div style="background:#1a1a2e;border-radius:8px 8px 0 0;padding:.75rem 1.25rem;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:15px;font-weight:700;color:#fff;letter-spacing:.03em">PREVENTIVE MAINTENANCE — FINDING & ACTION REPORT</div>
+          <div style="font-size:11px;color:#9999bb;margin-top:2px">Finding, Action & Sign-Off Record</div>
+        </div>
+        <div style="text-align:right;font-size:11px;color:#9999bb">
+          <div>Date: <span style="color:#f4b942;font-weight:600">${now}</span></div>
+          <div style="margin-top:2px">Equipment: <strong style="color:#fff">${data.length}</strong> &nbsp;|&nbsp; Findings: <strong style="color:#fff">${totalFindings}</strong> &nbsp;|&nbsp; Critical: <strong style="color:#ff6b6b">${totalCritical}</strong></div>
+        </div>
+      </div>
+      <!-- Column headers -->
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <colgroup>
+          <col style="width:10%"><col style="width:6%"><col style="width:8%">
+          <col style="width:7%"><col style="width:12%"><col style="width:5%">
+          <col style="width:5%"><col style="width:8%">
+          <col style="width:14%"><col style="width:12%">
+          <col style="width:8%"><col style="width:5%">
+        </colgroup>
+        <thead>
+          <tr style="background:#2d3a5e">
+            <th style="padding:.5rem .6rem;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border:1px solid #3d4a7e;text-align:left">Asset ID</th>
+            <th style="padding:.5rem .6rem;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border:1px solid #3d4a7e;text-align:left">EN</th>
+            <th style="padding:.5rem .6rem;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border:1px solid #3d4a7e;text-align:left">Date</th>
+            <th style="padding:.5rem .6rem;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border:1px solid #3d4a7e;text-align:left">Cust.</th>
+            <th style="padding:.5rem .6rem;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border:1px solid #3d4a7e;text-align:left">Project</th>
+            <th style="padding:.5rem .6rem;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border:1px solid #3d4a7e;text-align:left">Loc.</th>
+            <th style="padding:.5rem .6rem;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border:1px solid #3d4a7e;text-align:left">Proc.</th>
+            <th style="padding:.5rem .6rem;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border:1px solid #3d4a7e;text-align:left">PM Status</th>
+            <th style="padding:.5rem .6rem;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border:1px solid #3d4a7e;text-align:left">Finding</th>
+            <th style="padding:.5rem .6rem;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border:1px solid #3d4a7e;text-align:left">Action</th>
+            <th style="padding:.5rem .6rem;color:#f4b942;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border:1px solid #3d4a7e;text-align:left">Sign By</th>
+            <th style="padding:.5rem .6rem;color:#9999bb;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border:1px solid #3d4a7e;text-align:left">Remark</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
+  // Build rows — merge Asset ID cell across findings
+  data.forEach((d,di)=>{
+    const fcount = d.findings.length || 1;
+    const critCount = d.findings.filter(f=>f.action==='A1').length;
+    const pmBg = d.pmStatus==='PM Done'?'#e8f5e9':d.pmStatus==='Audit Pass'?'#e3f2fd':'#fff8e1';
+    const pmTx = d.pmStatus==='PM Done'?'#2e7d32':d.pmStatus==='Audit Pass'?'#1565c0':'#e65100';
+    const rowGroupBg = di%2===0 ? '#ffffff' : '#f8f9fc';
+
+    if(d.findings.length===0){
+      html+=`<tr style="background:${rowGroupBg}">
+        <td style="padding:.45rem .6rem;border:1px solid #e8e8f0;font-family:monospace;font-size:11px;font-weight:700;color:#1a1a2e">${d.id}</td>
+        <td style="padding:.45rem .6rem;border:1px solid #e8e8f0;font-size:11px">${d.en}</td>
+        <td style="padding:.45rem .6rem;border:1px solid #e8e8f0;font-size:11px">${d.date}</td>
+        <td style="padding:.45rem .6rem;border:1px solid #e8e8f0;font-size:11px">${d.cust}</td>
+        <td style="padding:.45rem .6rem;border:1px solid #e8e8f0;font-size:11px">${d.proj}</td>
+        <td style="padding:.45rem .6rem;border:1px solid #e8e8f0;font-size:11px">${d.loc}</td>
+        <td style="padding:.45rem .6rem;border:1px solid #e8e8f0;font-size:11px">${d.proc}</td>
+        <td style="padding:.45rem .6rem;border:1px solid #e8e8f0"><span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:${pmBg};color:${pmTx}">${d.pmStatus}</span></td>
+        <td style="padding:.45rem .6rem;border:1px solid #e8e8f0;color:#aaa;font-size:11px">—</td>
+        <td style="padding:.45rem .6rem;border:1px solid #e8e8f0;color:#aaa;font-size:11px">—</td>
+        <td style="padding:.45rem .6rem;border:1px solid #e8e8f0;min-width:80px"></td>
+        <td style="padding:.45rem .6rem;border:1px solid #e8e8f0"></td>
+      </tr>`;
+    } else {
+      d.findings.forEach((f,fi)=>{
+        const cp=getAcPill(f.action);
+        const isCrit=f.action==='A1';
+        const findBg=isCrit?'#fff5f5':rowGroupBg;
+        html+=`<tr style="background:${findBg}">`;
+        if(fi===0){
+          // Merged cells for asset info (rowspan)
+          html+=`<td rowspan="${fcount}" style="padding:.45rem .6rem;border:1px solid #e8e8f0;font-family:monospace;font-size:11px;font-weight:700;color:#1a1a2e;vertical-align:top;border-left:3px solid ${critCount>0?'#e74c3c':'#27ae60'}">${d.id}${critCount>0?`<br><span style="font-size:9px;color:#e74c3c;font-family:sans-serif">⚠ ${critCount} critical</span>`:''}</td>
+          <td rowspan="${fcount}" style="padding:.45rem .6rem;border:1px solid #e8e8f0;font-size:11px;vertical-align:top">${d.en}</td>
+          <td rowspan="${fcount}" style="padding:.45rem .6rem;border:1px solid #e8e8f0;font-size:11px;vertical-align:top">${d.date}</td>
+          <td rowspan="${fcount}" style="padding:.45rem .6rem;border:1px solid #e8e8f0;font-size:11px;vertical-align:top">${d.cust}</td>
+          <td rowspan="${fcount}" style="padding:.45rem .6rem;border:1px solid #e8e8f0;font-size:11px;vertical-align:top">${d.proj}</td>
+          <td rowspan="${fcount}" style="padding:.45rem .6rem;border:1px solid #e8e8f0;font-size:11px;vertical-align:top">${d.loc}</td>
+          <td rowspan="${fcount}" style="padding:.45rem .6rem;border:1px solid #e8e8f0;font-size:11px;vertical-align:top">${d.proc}</td>
+          <td rowspan="${fcount}" style="padding:.45rem .6rem;border:1px solid #e8e8f0;vertical-align:top"><span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:${pmBg};color:${pmTx}">${d.pmStatus}</span></td>`;
+        }
+        html+=`
+          <td style="padding:.45rem .6rem;border:1px solid #e8e8f0;font-size:11px${isCrit?';font-weight:600;color:#c0392b':''}">${f.desc||'—'}</td>
+          <td style="padding:.45rem .6rem;border:1px solid #e8e8f0"><span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:${cp.bg};color:${cp.text}">${AL[f.action]||f.action||'—'}</span></td>
+          <td style="padding:.45rem .6rem;border:1px solid #e8e8f0;min-width:80px;border-bottom:${fi===fcount-1?'2px solid #ccc':'1px solid #e8e8f0'}"></td>
+          <td style="padding:.45rem .6rem;border:1px solid #e8e8f0;border-bottom:${fi===fcount-1?'2px solid #ccc':'1px solid #e8e8f0'}"></td>
+        </tr>`;
+      });
+    }
+  });
+
+  html+=`</tbody></table></div>`;
+
+  // Footer signature
+  html+=`
+    <div style="margin-top:1.5rem;border:2px solid #1a1a2e;border-radius:8px;overflow:hidden;font-size:11px">
+      <div style="background:#1a1a2e;padding:.55rem 1rem;font-size:11px;font-weight:700;color:#fff">
+        ACKNOWLEDGEMENT — I hereby confirm that all findings and actions listed above have been reviewed and acknowledged
+      </div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="background:#2d3a5e">
+            <th style="padding:.4rem .75rem;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border:1px solid #3d4a7e;width:20%">Role</th>
+            <th style="padding:.4rem .75rem;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border:1px solid #3d4a7e;width:25%">Name</th>
+            <th style="padding:.4rem .75rem;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border:1px solid #3d4a7e;width:35%">Signature</th>
+            <th style="padding:.4rem .75rem;color:#fff;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border:1px solid #3d4a7e;width:20%">Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="background:#f0f4ff">
+            <td style="padding:.6rem .75rem;border:1px solid #e0e0e8;font-weight:700;color:#1a1a2e">
+              Performed By<br><span style="font-weight:400;color:#666;font-size:10px">PM Engineer</span>
+            </td>
+            <td style="padding:.6rem .75rem;border:1px solid #e0e0e8"><div style="border-bottom:1.5px solid #aaa;height:32px"></div></td>
+            <td style="padding:.6rem .75rem;border:1px solid #e0e0e8"><div style="border-bottom:1.5px solid #aaa;height:32px"></div></td>
+            <td style="padding:.6rem .75rem;border:1px solid #e0e0e8"><div style="border-bottom:1.5px solid #aaa;height:32px"></div></td>
+          </tr>
+          <tr style="background:#fff8f0">
+            <td style="padding:.6rem .75rem;border:1px solid #e0e0e8;font-weight:700;color:#1a1a2e">
+              Accepted By<br><span style="font-weight:400;color:#666;font-size:10px">Equipment Owner / Customer</span>
+            </td>
+            <td style="padding:.6rem .75rem;border:1px solid #e0e0e8"><div style="border-bottom:1.5px solid #aaa;height:32px"></div></td>
+            <td style="padding:.6rem .75rem;border:1px solid #e0e0e8"><div style="border-bottom:1.5px solid #aaa;height:32px"></div></td>
+            <td style="padding:.6rem .75rem;border:1px solid #e0e0e8"><div style="border-bottom:1.5px solid #aaa;height:32px"></div></td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="padding:.4rem 1rem;background:#f7f8fc;font-size:9px;color:#aaa;text-align:right">
+        Generated: ${now}  |  Total Equipment: ${data.length}  |  Total Findings: ${totalFindings}
+      </div>
+    </div>`;
+
+  document.getElementById('so-content').innerHTML=html;
+}
+
+// ===== MODAL =====
+function showModal(key){
+  const d=grouped.find(x=>x.en+'|'+x.id+'|'+x.date===key);
+  if(!d)return;
+  document.getElementById('m-id').textContent=d.id;
+  document.getElementById('m-meta').textContent=d.date+' · EN: '+d.en+' · '+d.proc+' · '+d.loc;
+  document.getElementById('m-info').innerHTML=`
+    <div class="info-item"><div class="info-lbl">Customer</div><div class="info-val">${d.cust||'—'}</div></div>
+    <div class="info-item"><div class="info-lbl">Project</div><div class="info-val">${d.proj||'—'}</div></div>
+    <div class="info-item"><div class="info-lbl">Process</div><div class="info-val">${d.proc||'—'}</div></div>
+    <div class="info-item"><div class="info-lbl">PM Status</div><div class="info-val">${d.pmStatus||'—'}</div></div>
+  `;
+  const critCount=d.findings.filter(f=>f.action==='A1').length;
+  document.getElementById('m-findings').innerHTML=d.findings.map((f,i)=>{
+    const c=getAC(f.action);
+    const actionLabel=AL[f.action]||f.action||'—';
+    const showAction = f.action ? actionLabel : (f.sub||'');
+    return`<div class="finding-row">
+      <div style="flex:1">
+        <div class="finding-desc">${f.desc||'—'}</div>
+        ${f.sub && f.action?`<div class="finding-sub">${f.sub}</div>`:''}
+      </div>
+      ${showAction?`<div class="finding-action"><span class="act-tag" style="background:${c.bg};color:${c.text}">${showAction}</span></div>`:''}
+    </div>`;
+  }).join('');
+
+  const actSummary={};d.findings.forEach(f=>{if(f.action)actSummary[f.action]=(actSummary[f.action]||0)+1;});
+  document.getElementById('m-summary').innerHTML=
+    `<span style="font-size:11px;color:#888;font-weight:600;margin-right:4px">Summary:</span>`+
+    Object.entries(actSummary).map(([a,n])=>{const c=getAC(a);return`<span class="summary-chip" style="background:${c.bg};color:${c.text}">${AL[a]||a} × ${n}</span>`;}).join('')+
+    (critCount>0?`<span class="summary-chip" style="background:#fdecea;color:#c0392b;margin-left:auto">⚠ ${critCount} Critical</span>`:'');
+
+  document.getElementById('modal-overlay').classList.remove('hidden');
+  document.body.style.overflow='hidden';
+}
+function hideModal(){document.getElementById('modal-overlay').classList.add('hidden');document.body.style.overflow='';}
+function closeModal(e){if(e.target===document.getElementById('modal-overlay'))hideModal();}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){hideModal();closeEvModal();}});
+// ===== CALENDAR ENGINE =====
+const STATUS_COLORS = {
+  'Planned':    {bg:'#e3f2fd',text:'#1565c0',dot:'#2979c4'},
+  'In Progress':{bg:'#fff8e1',text:'#e65100',dot:'#f4b942'},
+  'Done':       {bg:'#e8f5e9',text:'#2e7d32',dot:'#27ae60'},
+  'Postponed':  {bg:'#fdecea',text:'#c0392b',dot:'#e74c3c'},
+};
+
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth();
+let calView = 'month';
+let pmEvents = JSON.parse(localStorage.getItem('pm_events')||'[]');
+function saveEvents(){ localStorage.setItem('pm_events', JSON.stringify(pmEvents)); }
+
+function switchPage(page){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  document.getElementById('nav-'+page).classList.add('active');
+  if(page==='calendar') renderCalendar();
+}
+
+function calNav(dir){
+  if(calView==='month'){
+    calMonth+=dir;
+    if(calMonth>11){calMonth=0;calYear++;}
+    else if(calMonth<0){calMonth=11;calYear--;}
+  } else { calYear+=dir; }
+  renderCalendar();
+}
+function goToday(){ calYear=new Date().getFullYear(); calMonth=new Date().getMonth(); calView='month'; renderCalendar(); }
+function setView(v,btn){
+  calView=v;
+  document.querySelectorAll('#view-month,#view-week').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderCalendar();
+}
+
+function renderCalendar(){
+  const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const today=new Date(); today.setHours(0,0,0,0);
+
+  document.getElementById('cal-title').textContent = calView==='month' ? MONTHS[calMonth]+' '+calYear : 'Year '+calYear;
+
+  // Day names row
+  const dnEl=document.getElementById('cal-day-names');
+  dnEl.innerHTML = calView==='month' ? DAYS.map(d=>`<div class="cal-day-name">${d}</div>`).join('') : '';
+
+  const grid=document.getElementById('cal-grid');
+  grid.innerHTML='';
+
+  if(calView==='month'){
+    const firstDay=new Date(calYear,calMonth,1).getDay();
+    const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
+    const daysInPrev=new Date(calYear,calMonth,0).getDate();
+    const totalCells=Math.ceil((firstDay+daysInMonth)/7)*7;
+
+    for(let i=0;i<totalCells;i++){
+      let day,month,year,isOther=false;
+      if(i<firstDay){ day=daysInPrev-firstDay+1+i; month=calMonth-1; year=calYear; isOther=true; }
+      else if(i>=firstDay+daysInMonth){ day=i-firstDay-daysInMonth+1; month=calMonth+1; year=calYear; isOther=true; }
+      else { day=i-firstDay+1; month=calMonth; year=calYear; }
+      if(month<0){month=11;year--;} if(month>11){month=0;year++;}
+
+      const dateStr=year+'-'+String(month+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+      const cellDate=new Date(year,month,day);
+      const isToday=cellDate.getTime()===today.getTime();
+      const evs=pmEvents.filter(e=>e.date===dateStr);
+      const isWeekend=cellDate.getDay()===0||cellDate.getDay()===6;
+
+      const cell=document.createElement('div');
+      cell.className='cal-cell'+(isOther?' other-month':'')+(isToday?' today':'')+(evs.length?' has-events':'');
+      if(isWeekend&&!isOther) cell.style.background='#fafafa';
+
+      const numDiv=document.createElement('div');
+      numDiv.className='cal-date-num'+(isToday?' today-num':'');
+      numDiv.textContent=day;
+      cell.appendChild(numDiv);
+
+      evs.slice(0,3).forEach(ev=>{
+        const c=STATUS_COLORS[ev.status]||STATUS_COLORS['Planned'];
+        const evEl=document.createElement('div');
+        evEl.className='cal-event';
+        evEl.style.cssText='background:'+c.bg+';color:'+c.text;
+        evEl.textContent=(ev.cust?ev.cust+' · ':'')+ev.proj;
+        evEl.onclick=(e)=>{e.stopPropagation();openEditEvent(ev.id);};
+        cell.appendChild(evEl);
+      });
+      if(evs.length>3){
+        const more=document.createElement('div');
+        more.className='cal-more';
+        more.textContent='+'+( evs.length-3)+' more';
+        cell.appendChild(more);
+      }
+      cell.onclick=()=>openAddEvent(dateStr);
+      grid.appendChild(cell);
+    }
+
+  } else {
+    // Year view — 4 quarter cards
+    grid.style.gridTemplateColumns='repeat(2,1fr)';
+    const MNAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const QNAMES=['Q1 — Jan, Feb, Mar','Q2 — Apr, May, Jun','Q3 — Jul, Aug, Sep','Q4 — Oct, Nov, Dec'];
+    for(let q=0;q<4;q++){
+      const qDiv=document.createElement('div');
+      qDiv.style.cssText='background:#fff;border-radius:10px;padding:1rem;box-shadow:0 1px 4px rgba(0,0,0,.06)';
+      qDiv.innerHTML='<div style="font-size:12px;font-weight:700;color:#1a1a2e;margin-bottom:.6rem;padding-bottom:.4rem;border-bottom:1.5px solid #eee">'+QNAMES[q]+'</div>';
+      for(let m=q*3;m<q*3+3;m++){
+        const mEvs=pmEvents.filter(e=>{const d=new Date(e.date);return d.getFullYear()===calYear&&d.getMonth()===m;});
+        const mDiv=document.createElement('div');
+        mDiv.style.cssText='margin-bottom:.5rem';
+        mDiv.innerHTML='<div style="font-size:10px;font-weight:600;color:#888;padding:.2rem 0;margin-bottom:3px">'+MNAMES[m]+'  <span style="color:#1a1a2e;font-weight:700">('+mEvs.length+')</span></div>';
+        mEvs.slice(0,4).forEach(ev=>{
+          const c=STATUS_COLORS[ev.status]||STATUS_COLORS['Planned'];
+          const item=document.createElement('div');
+          item.style.cssText='font-size:10px;padding:2px 6px;border-radius:4px;margin-bottom:2px;background:'+c.bg+';color:'+c.text+';cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+          item.textContent=(ev.cust?ev.cust+' · ':'')+ev.proj;
+          item.onclick=()=>openEditEvent(ev.id);
+          mDiv.appendChild(item);
+        });
+        if(mEvs.length>4){const x=document.createElement('div');x.style.cssText='font-size:9px;color:#aaa;padding:1px 6px';x.textContent='+'+(mEvs.length-4)+' more';mDiv.appendChild(x);}
+        qDiv.appendChild(mDiv);
+      }
+      grid.appendChild(qDiv);
+    }
+  }
+
+  renderUpcoming();
+  renderCalSummary();
+}
+
+function renderUpcoming(){
+  const today=new Date(); today.setHours(0,0,0,0);
+  const up=pmEvents
+    .filter(e=>new Date(e.date)>=today&&e.status!=='Done')
+    .sort((a,b)=>a.date.localeCompare(b.date))
+    .slice(0,7);
+  const el=document.getElementById('upcoming-list');
+  if(!el) return;
+  if(!up.length){el.innerHTML='<div style="color:#bbb;font-size:12px;text-align:center;padding:.5rem">No upcoming plans</div>';return;}
+  el.innerHTML=up.map(ev=>{
+    const c=STATUS_COLORS[ev.status]||STATUS_COLORS['Planned'];
+    const diff=Math.ceil((new Date(ev.date)-today)/(864e5));
+    const diffStr=diff===0?'Today':diff===1?'Tomorrow':'In '+diff+' days';
+    return'<div class="upcoming-item" style="border-left-color:'+c.dot+'" onclick="openEditEvent(''+ev.id+'')">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">'+
+      '<span style="font-size:11px;font-weight:700;color:#1a1a2e">'+(ev.cust||'—')+'</span>'+
+      '<span style="font-size:10px;color:'+(diff<=3?'#e74c3c':'#888')+';font-weight:'+(diff<=3?'700':'400')+'">'+diffStr+'</span></div>'+
+      '<div style="font-size:11px;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(ev.proj||'—')+'</div>'+
+      '<div style="font-size:10px;color:#888;margin-top:2px">'+(ev.date||'')+' · '+(ev.proc||'')+' · EN '+(ev.en||'—')+'</div></div>';
+  }).join('');
+}
+
+function renderCalSummary(){
+  const el=document.getElementById('cal-summary');
+  if(!el)return;
+  const counts={'Planned':0,'In Progress':0,'Done':0,'Postponed':0};
+  pmEvents.forEach(e=>{if(counts[e.status]!==undefined)counts[e.status]++;});
+  el.innerHTML=Object.entries(counts).map(([s,n])=>{
+    const c=STATUS_COLORS[s];
+    return'<div style="display:flex;align-items:center;justify-content:space-between;padding:.3rem 0;border-bottom:.5px solid #f0f0f5">'+
+      '<div style="display:flex;align-items:center;gap:7px"><div style="width:8px;height:8px;border-radius:50%;background:'+c.dot+'"></div>'+
+      '<span style="font-size:12px;color:#555">'+s+'</span></div>'+
+      '<span style="font-size:12px;font-weight:700;color:#1a1a2e">'+n+'</span></div>';
+  }).join('')+'<div style="display:flex;justify-content:space-between;padding:.4rem 0;margin-top:4px">'+
+    '<span style="font-size:11px;font-weight:600;color:#888">Total Plans</span>'+
+    '<span style="font-size:13px;font-weight:700;color:#1a1a2e">'+pmEvents.length+'</span></div>';
+}
+
+// ---- Event CRUD ----
+function openAddEvent(dateStr){
+  document.getElementById('ev-modal-title').textContent='Add PM Plan';
+  document.getElementById('ev-id').value='';
+  document.getElementById('ev-cust').value='';
+  document.getElementById('ev-asset').value='';
+  document.getElementById('ev-proj').value='';
+  document.getElementById('ev-date').value=dateStr||'';
+  document.getElementById('ev-proc').value='ICT';
+  document.getElementById('ev-en').value='';
+  document.getElementById('ev-status').value='Planned';
+  document.getElementById('ev-note').value='';
+  document.getElementById('ev-delete-btn').style.display='none';
+  document.getElementById('ev-modal').classList.remove('hidden');
+}
+function openEditEvent(id){
+  const ev=pmEvents.find(e=>e.id===id);
+  if(!ev)return;
+  document.getElementById('ev-modal-title').textContent='Edit PM Plan';
+  document.getElementById('ev-id').value=ev.id;
+  document.getElementById('ev-cust').value=ev.cust||'';
+  document.getElementById('ev-asset').value=ev.asset||'';
+  document.getElementById('ev-proj').value=ev.proj||'';
+  document.getElementById('ev-date').value=ev.date||'';
+  document.getElementById('ev-proc').value=ev.proc||'ICT';
+  document.getElementById('ev-en').value=ev.en||'';
+  document.getElementById('ev-status').value=ev.status||'Planned';
+  document.getElementById('ev-note').value=ev.note||'';
+  document.getElementById('ev-delete-btn').style.display='inline-block';
+  document.getElementById('ev-modal').classList.remove('hidden');
+}
+function closeEvModal(){ document.getElementById('ev-modal').classList.add('hidden'); }
+function saveEvent(){
+  const id=document.getElementById('ev-id').value||'ev_'+Date.now();
+  const ev={
+    id,
+    cust:document.getElementById('ev-cust').value.trim(),
+    asset:document.getElementById('ev-asset').value.trim(),
+    proj:document.getElementById('ev-proj').value.trim(),
+    date:document.getElementById('ev-date').value,
+    proc:document.getElementById('ev-proc').value,
+    en:document.getElementById('ev-en').value.trim(),
+    status:document.getElementById('ev-status').value.replace(/^[🔵🟡🟢🔴]\s*/,''),
+    note:document.getElementById('ev-note').value.trim()
+  };
+  if(!ev.date){alert('Please select a PM date');return;}
+  const idx=pmEvents.findIndex(e=>e.id===id);
+  if(idx>=0) pmEvents[idx]=ev; else pmEvents.push(ev);
+  saveEvents(); closeEvModal(); renderCalendar();
+}
+function deleteEvent(){
+  const id=document.getElementById('ev-id').value;
+  if(!id)return;
+  if(!confirm('Delete this PM plan?'))return;
+  pmEvents=pmEvents.filter(e=>e.id!==id);
+  saveEvents(); closeEvModal(); renderCalendar();
+}
+
+</script>
+
+<!-- SIGN-OFF MODAL -->
+<div id="signoff-overlay" style="display:none;position:fixed;inset:0;background:rgba(10,10,30,.6);z-index:2000;overflow-y:auto;padding:1.5rem;backdrop-filter:blur(3px)">
+  <div style="max-width:900px;margin:0 auto;background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden">
+    
+    <!-- Modal Header -->
+    <div style="background:#1a1a2e;padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:15px;font-weight:700;color:#fff">PM / Audit Sign-Off Report</div>
+        <div id="so-subtitle" style="font-size:11px;color:#9999bb;margin-top:2px"></div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button onclick="printSignOff()" style="font-size:12px;padding:6px 16px;border-radius:6px;border:none;background:#f4b942;color:#1a1a2e;cursor:pointer;font-weight:700">🖨 Print / Save PDF</button>
+        <button onclick="closeSignOff()" style="background:transparent;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0 6px">✕</button>
+      </div>
+    </div>
+
+    <!-- Filter bar -->
+    <div style="padding:.75rem 1.5rem;background:#f7f8fc;border-bottom:1px solid #eee;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:11px;font-weight:600;color:#888">Filter:</span>
+      <select id="so-cust-filter" onchange="renderSignOff()" style="font-size:12px;padding:5px 10px;border-radius:6px;border:1px solid #dde;background:#fff">
+        <option value="all">All Customers</option>
+      </select>
+      <select id="so-en-filter" onchange="renderSignOff()" style="font-size:12px;padding:5px 10px;border-radius:6px;border:1px solid #dde;background:#fff">
+        <option value="all">All Engineers</option>
+      </select>
+      <select id="so-proc-filter" onchange="renderSignOff()" style="font-size:12px;padding:5px 10px;border-radius:6px;border:1px solid #dde;background:#fff">
+        <option value="all">All Stations</option>
+        <option value="ICT">ICT</option>
+        <option value="FCT">FCT</option>
+      </select>
+      <select id="so-date-filter" onchange="renderSignOff()" style="font-size:12px;padding:5px 10px;border-radius:6px;border:1px solid #dde;background:#fff">
+        <option value="all">All Dates</option>
+      </select>
+    </div>
+
+    <!-- Sign-Off Content -->
+    <div id="so-content" style="padding:1.5rem"></div>
+  </div>
+</div>
+
+<!-- PRINT STYLES -->
+<style>
+@media print {
+  body > *:not(#signoff-overlay) { display:none !important; }
+  #signoff-overlay { display:block !important; position:static !important; background:white !important; padding:0 !important; backdrop-filter:none !important; }
+  #signoff-overlay > div { box-shadow:none !important; border-radius:0 !important; max-width:100% !important; }
+  #signoff-overlay > div > div:first-child button { display:none !important; }
+  #signoff-overlay > div > div:nth-child(2) { display:none !important; }
+  .so-eq-card { page-break-inside:avoid; margin-bottom:12px !important; }
+  .so-page-break { page-break-before:always; }
+}
+.so-eq-card { border:1px solid #e0e0e8; border-radius:10px; margin-bottom:16px; overflow:hidden; }
+.so-card-head { background:#1a1a2e; padding:.6rem 1rem; display:flex; align-items:center; justify-content:space-between; }
+.so-info-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:0; border-bottom:1px solid #eee; }
+.so-info-cell { padding:.45rem .75rem; border-right:1px solid #eee; }
+.so-info-cell:last-child { border-right:none; }
+.so-info-lbl { font-size:9px; font-weight:700; color:#888; text-transform:uppercase; letter-spacing:.04em; margin-bottom:2px; }
+.so-info-val { font-size:12px; font-weight:600; color:#1a1a2e; }
+.so-finding-row { display:grid; grid-template-columns:28px 1fr 1fr 110px; gap:0; border-bottom:.5px solid #f0f0f5; align-items:center; }
+.so-finding-row:last-child { border-bottom:none; }
+.so-finding-cell { padding:.4rem .6rem; font-size:11px; }
+.so-sig-grid { display:grid; grid-template-columns:1fr 1fr 1fr; border-top:1px solid #eee; }
+.so-sig-cell { padding:.6rem .75rem; border-right:1px solid #eee; }
+.so-sig-cell:last-child { border-right:none; }
+.so-sig-lbl { font-size:9px; font-weight:700; color:#888; text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px; }
+.so-sig-line { border-bottom:1.5px solid #ccc; height:28px; margin-bottom:4px; }
+.so-sig-name { font-size:10px; color:#888; text-align:center; }
+.act-pill { display:inline-block; font-size:10px; font-weight:600; padding:2px 7px; border-radius:4px; }
+</style>
+
+</body>
+</html>
